@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import { useSelector } from "react-redux";
 import { wrapper } from "../../store/store";
 import { paymentOverviewFetch } from "../../store/paymentsSlice";
+import axios from 'axios';
+import { loadStripe } from '@stripe/stripe-js';
 
 const CaseDetails = ({ allPayments }) => {
   const [info, setInfo] = useState([]);
@@ -46,6 +48,48 @@ const CaseDetails = ({ allPayments }) => {
 
   console.log(info);
 
+  const [name, setName] = useState('')
+  const [price, setPrice] = useState(0)
+
+  const publishableKey = `${process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}`;
+  const stripePromise = loadStripe(publishableKey);
+
+  const makePayment = async () => {
+    console.log(`Is it coming here`);
+    const paymentDetails = {
+      campaignId: caseDetailsId,
+      paymentId: '324jh32b432kjb32',
+      donater: name,
+      donation_amount: Number(price),
+    };
+    console.log(`These are the payment Details ${paymentDetails}`);
+    const response = await fetch('/api/addPaymentDetails', {
+      method: 'POST',
+      body: JSON.stringify({ paymentDetails }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    const data = await response.json();
+    console.log(`This is the data recieved from the server ${data}`);
+  };
+
+  const checkout = async () => {
+    makePayment()
+    const stripe = await stripePromise;
+    
+    const checkoutSession = await axios.post('/api/create-stripe-session', {
+      donation: { name, price },
+    });
+    console.log(`Is it comeing here ${checkoutSession}`);
+    const result = await stripe.redirectToCheckout({
+      sessionId: checkoutSession.data.id,
+    });
+    if (result.error) {
+      alert(result.error.message);
+    }
+  };
+ 
   // const caseDetailsId = "ywyuuwuwourrrr"
   return (
     <div className="max-w-6xl mx-auto mt-4 mb-4 p-3">
@@ -204,16 +248,26 @@ const CaseDetails = ({ allPayments }) => {
                 type="text"
                 required
                 placeholder="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="bg-gray-50 rounded-lg p-3 outline-none"
               />
               <label>Price</label>
               <input
                 required
                 placeholder="Price"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
                 className="bg-gray-50 rounded-lg p-3 outline-none"
               />
               <p className="mb-3">10 donations</p>
-              <button className="btn bg-[#8f0d34] hover:bg-[#530319] p-3 mb-3 w-full rounded-md text-white font-bold">
+              <button 
+                className="btn bg-[#8f0d34] hover:bg-[#530319] p-3 mb-3 w-full rounded-md text-white font-bold"
+                onClick={(e) => {
+                  e.preventDefault()
+                  checkout()
+                }}
+              >
                 Donate
               </button>
             </form>
